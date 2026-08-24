@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+*.elf
+*.bin
+*.hex
+*.map
+
+# CMake and Ninja caches
+CMakeCache.txt
+CMakeFiles/
+.ninja_deps
+.ninja_log
+
+# VS Code environment
+.vscode/
+
+# FreeRTOS Windows Simulator (if used later)
+*.exe
