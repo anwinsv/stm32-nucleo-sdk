@@ -25,6 +25,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "stm32g4xx_nucleo.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,7 +65,19 @@ int _write(int file, char *ptr, int len) {
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void vBlinkLEDTask(void *pvParameters) {
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle the User LED (PA5)
+        vTaskDelay(pdMS_TO_TICKS(500)); //yield to scheduler for 500ms
+    }
+}
 
+void vPrintTask(void *pvParameters) {
+    while (1) {
+        printf("NUCLEO-G491RE: FreeRTOS Scheduler is running. Clock: 170MHz.\r\n");
+        vTaskDelay(pdMS_TO_TICKS(1000)); //yield to scheduler for 1000ms
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -96,8 +111,6 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
 
-  /* USER CODE END 2 */
-
   /* Initialize led */
   BSP_LED_Init(LED_GREEN);
 
@@ -115,13 +128,24 @@ int main(void)
     Error_Handler();
   }
 
+  //Register task 1
+  xTaskCreate(vBlinkLEDTask, "BlinkLED", 128, NULL, 1, NULL);
+  //Register task 2
+  xTaskCreate(vPrintTask, "Print", 128, NULL, 1, NULL);
+
+  //Hand control over to FreeRTOS scheduler
+  vTaskStartScheduler();
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle the User LED (PA5)
-    printf("NUCLEO-G491RE is online. Clock running at 170MHz.\r\n");
-    HAL_Delay(500);
+    /** Program shall never reach this point 
+     * LED blinking and printing tasks are handled by FreeRTOS scheduler.
+    */
+    // HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle the User LED (PA5)
+    // printf("NUCLEO-G491RE is online. Clock running at 170MHz.\r\n");
+    // HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
