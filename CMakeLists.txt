@@ -45,6 +45,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    sdk/src/stm32g4_uart.c
     middleware/FreeRTOS/croutine.c
     middleware/FreeRTOS/event_groups.c
     middleware/FreeRTOS/list.c
@@ -59,7 +60,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    #sdk/inc
+    sdk/inc
     middleware/FreeRTOS/include
     middleware/FreeRTOS/portable/GCC/ARM_CM4F/
 )
