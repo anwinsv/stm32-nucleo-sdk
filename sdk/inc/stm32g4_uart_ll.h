@@ -63,4 +63,29 @@ uint8_t uart_ll_is_rx_ready(uart_instance_t instance);
  */
 uint8_t uart_ll_read_byte(uart_instance_t instance);
 
+/**
+ * Enable/Disable TXE (Transmit Data Register Empty) interrupt.
+ */
+void uart_ll_enable_tx_interrupt(uart_instance_t instance);
+void uart_ll_disable_tx_interrupt(uart_instance_t instance);
+
+/**
+ * Enable/Disable TC (Transmission Complete) interrupt.
+ */
+void uart_ll_enable_tc_interrupt(uart_instance_t instance);
+void uart_ll_disable_tc_interrupt(uart_instance_t instance);
+
+/**
+ * Enable/Disable RXNE (Receive Data Register Not Empty) interrupt.
+ */
+void uart_ll_enable_rx_interrupt(uart_instance_t instance);
+void uart_ll_disable_rx_interrupt(uart_instance_t instance);
+
+/**
+ * Check if specific interrupts are enabled in CR1.
+ */
+uint8_t uart_ll_is_tx_interrupt_enabled(uart_instance_t instance);
+uint8_t uart_ll_is_tc_interrupt_enabled(uart_instance_t instance);
+uint8_t uart_ll_is_rx_interrupt_enabled(uart_instance_t instance);
+
 #endif /* STM32G4_UART_LL_H */
