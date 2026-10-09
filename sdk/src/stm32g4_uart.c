@@ -4,6 +4,8 @@
  */
 #include "stm32g4_uart.h"
 #include "stm32g4_uart_ll.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 typedef enum
 {
@@ -41,6 +43,9 @@ struct uart_descriptor
 
     uart_tx_transfer_t tx;
     uart_rx_transfer_t rx;
+    
+    TaskHandle_t tx_task;
+    TaskHandle_t rx_task;
 };
 
 static struct uart_descriptor uart_instances[UART_INSTANCE_COUNT];
@@ -358,7 +363,41 @@ uart_status uart_read_polling(
     return UART_OK;
 }
 
-uart_status uart_write_interrupt(
+static uart_status uart_write_internal(
+    uart_handle_t uart,
+    const uint8_t *buffer,
+    size_t length,
+    uint8_t is_sync)
+{
+    uart_status status = uart_validate_transfer(uart, buffer, length, 1U);
+    if (status != UART_OK)
+    {
+        return status;
+    }
+
+    uart->tx.state = UART_TRANSFER_ACTIVE;
+    uart->tx.buffer = buffer;
+    uart->tx.length = length;
+    uart->tx.completed = 0U;
+    
+    if (is_sync)
+    {
+        /* Store the calling task's handle so the ISR knows who to notify */
+        uart->tx_task = xTaskGetCurrentTaskHandle();
+        /* Clear any pending notifications before enabling interrupts */
+        ulTaskNotifyTake(pdTRUE, 0);
+    }
+    else
+    {
+        uart->tx_task = NULL;
+    }
+
+    /* Enable TXE interrupt to jump into the ISR and start the transfer */
+    uart_ll_enable_tx_interrupt(uart->instance);
+    return UART_OK;
+}
+
+uart_status uart_write_sync(
     uart_handle_t uart,
     const uint8_t *buffer,
     size_t length,
@@ -366,19 +405,84 @@ uart_status uart_write_interrupt(
     size_t *written)
 {
     uart_status status;
-
-    (void)timeout_ticks;
+    uint32_t notified_val;
 
     if (written != NULL)
     {
         *written = 0U;
     }
 
-    status = uart_validate_transfer(uart, buffer, length, 1U);
-    return (status == UART_OK) ? UART_NOT_SUPPORTED : status;
+    status = uart_write_internal(uart, buffer, length, 1U);
+    if (status != UART_OK)
+    {
+        return status;
+    }
+
+    /* Block the task until the ISR notifies completion or we time out */
+    notified_val = ulTaskNotifyTake(pdTRUE, timeout_ticks);
+
+    if (notified_val == 0U)
+    {
+        /* Timeout occurred */
+        uart_ll_disable_tx_interrupt(uart->instance);
+        uart_ll_disable_tc_interrupt(uart->instance);
+        uart->tx.state = UART_TRANSFER_TIMED_OUT;
+        
+        if (written != NULL)
+        {
+            *written = uart->tx.completed;
+        }
+        return UART_TIMEOUT;
+    }
+
+    if (written != NULL)
+    {
+        *written = uart->tx.completed;
+    }
+    
+    return UART_OK;
 }
 
-uart_status uart_read_interrupt(
+uart_status uart_write_async(
+    uart_handle_t uart,
+    const uint8_t *buffer,
+    size_t length)
+{
+    return uart_write_internal(uart, buffer, length, 0U);
+}
+
+static uart_status uart_read_internal(
+    uart_handle_t uart,
+    uint8_t *buffer,
+    size_t length,
+    uint8_t is_sync)
+{
+    uart_status status = uart_validate_transfer(uart, buffer, length, 0U);
+    if (status != UART_OK)
+    {
+        return status;
+    }
+
+    uart->rx.state = UART_TRANSFER_ACTIVE;
+    uart->rx.buffer = buffer;
+    uart->rx.length = length;
+    uart->rx.completed = 0U;
+    
+    if (is_sync)
+    {
+        uart->rx_task = xTaskGetCurrentTaskHandle();
+        ulTaskNotifyTake(pdTRUE, 0);
+    }
+    else
+    {
+        uart->rx_task = NULL;
+    }
+
+    uart_ll_enable_rx_interrupt(uart->instance);
+    return UART_OK;
+}
+
+uart_status uart_read_sync(
     uart_handle_t uart,
     uint8_t *buffer,
     size_t length,
@@ -386,16 +490,129 @@ uart_status uart_read_interrupt(
     size_t *read)
 {
     uart_status status;
-
-    (void)timeout_ticks;
+    uint32_t notified_val;
 
     if (read != NULL)
     {
         *read = 0U;
     }
 
-    status = uart_validate_transfer(uart, buffer, length, 0U);
-    return (status == UART_OK) ? UART_NOT_SUPPORTED : status;
+    status = uart_read_internal(uart, buffer, length, 1U);
+    if (status != UART_OK)
+    {
+        return status;
+    }
+
+    notified_val = ulTaskNotifyTake(pdTRUE, timeout_ticks);
+
+    if (notified_val == 0U)
+    {
+        uart_ll_disable_rx_interrupt(uart->instance);
+        uart->rx.state = UART_TRANSFER_TIMED_OUT;
+        
+        if (read != NULL)
+        {
+            *read = uart->rx.completed;
+        }
+        return UART_TIMEOUT;
+    }
+
+    if (read != NULL)
+    {
+        *read = uart->rx.completed;
+    }
+    
+    return UART_OK;
+}
+
+uart_status uart_read_async(
+    uart_handle_t uart,
+    uint8_t *buffer,
+    size_t length)
+{
+    return uart_read_internal(uart, buffer, length, 0U);
+}
+
+void uart_irq_handler(uart_handle_t uart)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if ((uart == NULL) || (uart->is_open != UART_OPEN))
+    {
+        return;
+    }
+
+    /* -------------------------------------------------------------
+     * TRANSMIT LOGIC
+     * ------------------------------------------------------------- */
+    if ((uart_ll_is_tx_interrupt_enabled(uart->instance) != 0U) &&
+        (uart_ll_is_tx_empty(uart->instance) != 0U))
+    {
+        if (uart->tx.completed < uart->tx.length)
+        {
+            uart_ll_write_byte(uart->instance, uart->tx.buffer[uart->tx.completed]);
+            uart->tx.completed++;
+        }
+        else
+        {
+            /* All bytes written to TDR. Disable TXE interrupt, wait for TC */
+            uart_ll_disable_tx_interrupt(uart->instance);
+            uart_ll_enable_tc_interrupt(uart->instance);
+        }
+    }
+
+    if ((uart_ll_is_tc_interrupt_enabled(uart->instance) != 0U) &&
+        (uart_ll_is_tx_complete(uart->instance) != 0U))
+    {
+        /* Transmission fully complete */
+        uart_ll_disable_tc_interrupt(uart->instance);
+        uart->tx.state = UART_TRANSFER_IDLE;
+
+        if (uart->tx_task != NULL)
+        {
+            /* Sync transfer: Wake the waiting task */
+            vTaskNotifyGiveFromISR(uart->tx_task, &xHigherPriorityTaskWoken);
+        }
+        else if (uart->config.tx_cb != NULL)
+        {
+            /* Async transfer: Call the user callback */
+            uart->config.tx_cb(uart, UART_OK, uart->tx.completed);
+        }
+    }
+
+    /* -------------------------------------------------------------
+     * RECEIVE LOGIC
+     * ------------------------------------------------------------- */
+    if ((uart_ll_is_rx_interrupt_enabled(uart->instance) != 0U) &&
+        (uart_ll_is_rx_ready(uart->instance) != 0U))
+    {
+        if (uart->rx.completed < uart->rx.length)
+        {
+            uart->rx.buffer[uart->rx.completed] = uart_ll_read_byte(uart->instance);
+            uart->rx.completed++;
+        }
+
+        if (uart->rx.completed >= uart->rx.length)
+        {
+            /* Reception fully complete */
+            uart_ll_disable_rx_interrupt(uart->instance);
+            uart->rx.state = UART_TRANSFER_IDLE;
+
+            if (uart->rx_task != NULL)
+            {
+                /* Sync transfer: Wake the waiting task */
+                vTaskNotifyGiveFromISR(uart->rx_task, &xHigherPriorityTaskWoken);
+            }
+            else if (uart->config.rx_cb != NULL)
+            {
+                /* Async transfer: Call the user callback */
+                uart->config.rx_cb(uart, UART_OK, uart->rx.completed);
+            }
+        }
+    }
+
+    /* Yield if a higher priority task was woken by the notifications */
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 uart_status uart_close(uart_handle_t uart)

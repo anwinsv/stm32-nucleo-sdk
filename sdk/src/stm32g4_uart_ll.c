@@ -260,3 +260,39 @@ uint8_t uart_ll_is_rx_ready(uart_instance_t instance) {
 uint8_t uart_ll_read_byte(uart_instance_t instance) {
     return (uint8_t)(hw_configs[instance].regs->RDR & 0xFFU);
 }
+
+void uart_ll_enable_tx_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 |= USART_CR1_TXEIE;
+}
+
+void uart_ll_disable_tx_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 &= ~USART_CR1_TXEIE;
+}
+
+void uart_ll_enable_tc_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 |= USART_CR1_TCIE;
+}
+
+void uart_ll_disable_tc_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 &= ~USART_CR1_TCIE;
+}
+
+void uart_ll_enable_rx_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 |= USART_CR1_RXNEIE;
+}
+
+void uart_ll_disable_rx_interrupt(uart_instance_t instance) {
+    hw_configs[instance].regs->CR1 &= ~USART_CR1_RXNEIE;
+}
+
+uint8_t uart_ll_is_tx_interrupt_enabled(uart_instance_t instance) {
+    return (hw_configs[instance].regs->CR1 & USART_CR1_TXEIE) ? 1U : 0U;
+}
+
+uint8_t uart_ll_is_tc_interrupt_enabled(uart_instance_t instance) {
+    return (hw_configs[instance].regs->CR1 & USART_CR1_TCIE) ? 1U : 0U;
+}
+
+uint8_t uart_ll_is_rx_interrupt_enabled(uart_instance_t instance) {
+    return (hw_configs[instance].regs->CR1 & USART_CR1_RXNEIE) ? 1U : 0U;
+}

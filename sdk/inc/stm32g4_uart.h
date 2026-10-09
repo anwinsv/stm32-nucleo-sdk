@@ -96,6 +96,12 @@ typedef enum
     UART_FLOW_CONTROL_RTS_CTS
 } uart_flow_control_t;
 
+struct uart_descriptor;
+typedef struct uart_descriptor *uart_handle_t;
+
+/** Callback invoked when an async transfer completes (or fails). */
+typedef void (*uart_callback_t)(uart_handle_t uart, uart_status status, size_t transferred);
+
 /** Communication settings requested for one UART instance. */
 typedef struct
 {
@@ -107,6 +113,8 @@ typedef struct
     uart_mode_t mode;
     uart_fifo_mode_t fifo_mode;
     uart_flow_control_t flow_control;
+    uart_callback_t tx_cb;
+    uart_callback_t rx_cb;
 } uart_config_t;
 
 /**
@@ -115,8 +123,6 @@ typedef struct
  * Its layout is deliberately private to stm32g4_uart.c, so application code
  * can only pass a handle to UART APIs and cannot alter driver state.
  */
-struct uart_descriptor;
-typedef struct uart_descriptor *uart_handle_t;
 
 /**
  * Acquire the driver-owned handle for an instance.
@@ -159,10 +165,9 @@ uart_status uart_read_polling(
 
 /**
  * Transmit using UART interrupts, blocking the calling FreeRTOS task until
- * completion or timeout. This API must not be called before the scheduler runs.
- * timeout_ticks uses the FreeRTOS tick period; written may be NULL.
+ * completion or timeout.
  */
-uart_status uart_write_interrupt(
+uart_status uart_write_sync(
     uart_handle_t uart,
     const uint8_t *buffer,
     size_t length,
@@ -170,16 +175,42 @@ uart_status uart_write_interrupt(
     size_t *written);
 
 /**
- * Receive using UART interrupts, blocking the calling FreeRTOS task until
- * completion, error, or timeout. This API must not be called before the
- * scheduler runs. timeout_ticks uses the FreeRTOS tick period; read may be NULL.
+ * Transmit asynchronously using UART interrupts. Returns immediately.
+ * The tx_cb callback in uart_config_t will be invoked upon completion.
  */
-uart_status uart_read_interrupt(
+uart_status uart_write_async(
+    uart_handle_t uart,
+    const uint8_t *buffer,
+    size_t length);
+
+/**
+ * Receive using UART interrupts, blocking the calling FreeRTOS task until
+ * completion, error, or timeout.
+ */
+uart_status uart_read_sync(
     uart_handle_t uart,
     uint8_t *buffer,
     size_t length,
     uint32_t timeout_ticks,
     size_t *read);
+
+/**
+ * Receive asynchronously using UART interrupts. Returns immediately.
+ * The rx_cb callback in uart_config_t will be invoked upon completion.
+ */
+uart_status uart_read_async(
+    uart_handle_t uart,
+    uint8_t *buffer,
+    size_t length);
+
+/**
+ * Generic Interrupt Service Routine (ISR) handler for UART.
+ * 
+ * This function should be called from the actual hardware interrupt handlers
+ * (e.g., USART1_IRQHandler) once the NVIC is configured. It processes
+ * TX/RX logic, manages state, and triggers FreeRTOS task wakeups or user callbacks.
+ */
+void uart_irq_handler(uart_handle_t uart);
 
 /** Release an open descriptor and clear all driver-owned state. */
 uart_status uart_close(uart_handle_t uart);
