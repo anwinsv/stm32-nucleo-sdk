@@ -78,6 +78,22 @@ void vPrintTask(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(1000)); //yield to scheduler for 1000ms
     }
 }
+
+void vApplicationTickHook(void) {
+    HAL_IncTick();
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    (void)xTask;
+    (void)pcTaskName;
+    taskDISABLE_INTERRUPTS();
+    while (1);
+}
+
+void vApplicationMallocFailedHook(void) {
+    taskDISABLE_INTERRUPTS();
+    while (1);
+}
 /* USER CODE END 0 */
 
 /**
