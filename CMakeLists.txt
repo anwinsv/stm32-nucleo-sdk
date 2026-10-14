@@ -45,7 +45,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    sdk/src/stm32g4_uart.c
+    sdk/src/uart/stm32g4_uart.c
+    sdk/src/uart/stm32g4_uart_ll.c
     middleware/FreeRTOS/croutine.c
     middleware/FreeRTOS/event_groups.c
     middleware/FreeRTOS/list.c
