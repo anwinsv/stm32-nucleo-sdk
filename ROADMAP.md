@@ -6,12 +6,12 @@ Planned work for `stm32-nucleo-sdk`, in rough priority order. Items are intentio
 
 Goal: UART is merged to `main` and proven on the board.
 
-- [ ] Add `sdk/src/stm32g4_uart_ll.c` to `CMakeLists.txt`; get a clean build
-- [ ] Add `USARTx_IRQHandler` / `LPUART1_IRQHandler` entries that call `uart_irq_handler()`
-- [ ] Add NVIC enable and priority setup (respect `configMAX_SYSCALL_INTERRUPT_PRIORITY`)
+- [x] Add `sdk/src/uart/stm32g4_uart_ll.c` to `CMakeLists.txt`; get a clean build
+- [x] Add `USARTx_IRQHandler` / `LPUART1_IRQHandler` entries that call `uart_irq_handler()`
+- [x] Add NVIC enable and priority setup (respect `configMAX_SYSCALL_INTERRUPT_PRIORITY`)
 - [ ] Route `printf` (`_write`) through the SDK UART instead of the Cube HAL
-- [ ] Hardware tests on LPUART1 (ST-LINK VCP): polling TX/RX, sync TX/RX, async + callbacks, timeouts
-- [ ] Handle ORE / FE / NE / PE in the ISR, clear flags, report `UART_ERROR` through callbacks
+- [x] Hardware tests on LPUART1 (ST-LINK VCP): polling TX/RX, sync TX/RX, async + callbacks, timeouts
+- [x] Handle ORE / FE / NE / PE in the ISR, clear flags, report `UART_ERROR` through callbacks
 - [ ] Clean up stale header comments; implement or remove FIFO and flow-control config fields
 - [ ] Fix GitHub "About" text (NUCLEO-G491RE)
 - [ ] Merge `feature/uart` into `main`
