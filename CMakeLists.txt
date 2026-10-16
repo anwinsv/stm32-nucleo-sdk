@@ -57,12 +57,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     middleware/FreeRTOS/portable/MemMang/heap_4.c
     middleware/FreeRTOS/portable/GCC/ARM_CM4F/port.c
     sdk/src/nvic/stm32g4_nvic.c
+    examples/uart_example.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     sdk/inc
+    examples
     middleware/FreeRTOS/include
     middleware/FreeRTOS/portable/GCC/ARM_CM4F/
 )

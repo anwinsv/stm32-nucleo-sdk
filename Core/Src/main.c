@@ -28,6 +28,7 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "uart_example.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -134,6 +135,7 @@ int main(void)
   BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 
   /* Initialize COM1 port (115200, 8 bits (7-bit data + 1 stop bit), no parity */
+  /* Kept commented while validating SDK UART on LPUART1
   BspCOMInit.BaudRate   = 115200;
   BspCOMInit.WordLength = COM_WORDLENGTH_8B;
   BspCOMInit.StopBits   = COM_STOPBITS_1;
@@ -143,11 +145,15 @@ int main(void)
   {
     Error_Handler();
   }
+  */
 
-  //Register task 1
+  /* Start UART & NVIC validation example on LPUART1 */
+  uart_example_start();
+
+  //Register task 1 (Blink User LED)
   xTaskCreate(vBlinkLEDTask, "BlinkLED", 128, NULL, 1, NULL);
-  //Register task 2
-  xTaskCreate(vPrintTask, "Print", 128, NULL, 1, NULL);
+  //Register task 2 (kept commented while validating SDK UART)
+  //xTaskCreate(vPrintTask, "Print", 128, NULL, 1, NULL);
 
   //Hand control over to FreeRTOS scheduler
   vTaskStartScheduler();
