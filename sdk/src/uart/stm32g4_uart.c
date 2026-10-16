@@ -4,6 +4,7 @@
  */
 #include "stm32g4_uart.h"
 #include "stm32g4_uart_ll.h"
+#include "stm32g4_nvic.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -49,6 +50,17 @@ struct uart_descriptor
 };
 
 static struct uart_descriptor uart_instances[UART_INSTANCE_COUNT];
+
+#define UART_DEFAULT_IRQ_PRIORITY   (6U)
+
+static const IRQn_Type uart_irq_map[UART_INSTANCE_COUNT] = {
+    [UART_INSTANCE_USART1]  = USART1_IRQn,
+    [UART_INSTANCE_USART2]  = USART2_IRQn,
+    [UART_INSTANCE_USART3]  = USART3_IRQn,
+    [UART_INSTANCE_UART4]   = UART4_IRQn,
+    [UART_INSTANCE_UART5]   = UART5_IRQn,
+    [UART_INSTANCE_LPUART1] = LPUART1_IRQn
+};
 
 static const uart_config_t uart_default_config =
 {
@@ -212,6 +224,11 @@ uart_handle_t uart_open(uart_instance_t instance)
 
         uart_ll_enable_clocks(instance);
         uart_ll_init_gpio(instance);
+
+        /* Configure and enable peripheral interrupt in NVIC */
+        (void)nvic_init();
+        (void)nvic_set_priority(uart_irq_map[instance], UART_DEFAULT_IRQ_PRIORITY);
+        (void)nvic_irq_enable(uart_irq_map[instance]);
     }
 
     return uart;
@@ -478,6 +495,7 @@ static uart_status uart_read_internal(
         uart->rx_task = NULL;
     }
 
+    uart_ll_clear_errors(uart->instance);
     uart_ll_enable_rx_interrupt(uart->instance);
     return UART_OK;
 }
@@ -541,6 +559,9 @@ void uart_irq_handler(uart_handle_t uart)
     {
         return;
     }
+
+    /* Clear any overrun, framing or noise errors so RX interrupt never gets stuck */
+    uart_ll_clear_errors(uart->instance);
 
     /* -------------------------------------------------------------
      * TRANSMIT LOGIC
@@ -640,9 +661,46 @@ uart_status uart_close(uart_handle_t uart)
     }
 
     instance = uart->instance;
+    (void)nvic_irq_disable(uart_irq_map[instance]);
+    (void)nvic_clear_pending(uart_irq_map[instance]);
     uart_ll_disable(instance);
 
     uart_reset_descriptor(uart, instance);
 
     return UART_OK;
 }
+
+/* -------------------------------------------------------------
+ * HARDWARE INTERRUPT HANDLERS
+ * ------------------------------------------------------------- */
+
+void USART1_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_USART1]);
+}
+
+void USART2_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_USART2]);
+}
+
+void USART3_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_USART3]);
+}
+
+void UART4_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_UART4]);
+}
+
+void UART5_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_UART5]);
+}
+
+void LPUART1_IRQHandler(void)
+{
+    uart_irq_handler(&uart_instances[UART_INSTANCE_LPUART1]);
+}
+

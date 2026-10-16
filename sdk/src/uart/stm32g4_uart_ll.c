@@ -296,3 +296,7 @@ uint8_t uart_ll_is_tc_interrupt_enabled(uart_instance_t instance) {
 uint8_t uart_ll_is_rx_interrupt_enabled(uart_instance_t instance) {
     return (hw_configs[instance].regs->CR1 & USART_CR1_RXNEIE) ? 1U : 0U;
 }
+
+void uart_ll_clear_errors(uart_instance_t instance) {
+    hw_configs[instance].regs->ICR = (USART_ICR_ORECF | USART_ICR_FECF | USART_ICR_PECF | USART_ICR_NECF);
+}

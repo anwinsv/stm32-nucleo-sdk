@@ -88,4 +88,9 @@ uint8_t uart_ll_is_tx_interrupt_enabled(uart_instance_t instance);
 uint8_t uart_ll_is_tc_interrupt_enabled(uart_instance_t instance);
 uint8_t uart_ll_is_rx_interrupt_enabled(uart_instance_t instance);
 
+/**
+ * Clear receiver error flags (Overrun, Framing, Parity, Noise detected).
+ */
+void uart_ll_clear_errors(uart_instance_t instance);
+
 #endif /* STM32G4_UART_LL_H */
